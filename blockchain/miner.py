@@ -7,24 +7,34 @@ from uuid import uuid4
 
 from timeit import default_timer as timer
 
+import json
 import random
 
 
 def proof_of_work(last_proof):
     """
     Multi-Ouroboros of Work Algorithm
-    - Find a number p' such that the last five digits of hash(p) are equal
-    to the first five digits of hash(p')
-    - IE:  last_hash: ...AE912345, new hash 12345888...
+    - Find a number p' such that the last six digits of hash(p) are equal
+    to the first six digits of hash(p')
+    - IE:  last_hash: ...AE9123456, new hash 123456888...
     - p is the previous proof, and p' is the new proof
     - Use the same method to generate SHA-256 hashes as the examples in class
     """
+    last = f'{last_proof}'.encode()
+    last_hash = hashlib.sha256(last).hexdigest()
+
+    proof = random.getrandbits(256)
 
     start = timer()
-
     print("Searching for next proof")
-    proof = 0
-    #  TODO: Your code here
+
+    count = 0
+    while valid_proof(last_hash, proof) is False:
+        proof = random.getrandbits(256)
+        count += 1
+
+        if count > 2000000:
+            return "Close and try again"
 
     print("Proof found: " + str(proof) + " in " + str(timer() - start))
     return proof
@@ -32,15 +42,17 @@ def proof_of_work(last_proof):
 
 def valid_proof(last_hash, proof):
     """
-    Validates the Proof:  Multi-ouroborus:  Do the last five characters of
-    the hash of the last proof match the first five characters of the hash
+    Validates the Proof:  Multi-ouroborus:  Do the last six characters of
+    the hash of the last proof match the first six characters of the hash
     of the new proof?
-
-    IE:  last_hash: ...AE912345, new hash 12345E88...
+    IE:  last_hash: ...AE9123456, new hash 123456E88...
     """
 
     # TODO: Your code here!
-    pass
+    guess = f"{proof}".encode()
+    guess_hash = hashlib.sha256(guess).hexdigest()
+
+    return last_hash[-5:] == guess_hash[:5]
 
 
 if __name__ == '__main__':
@@ -66,7 +78,13 @@ if __name__ == '__main__':
         # Get the last proof from the server
         r = requests.get(url=node + "/last_proof")
         data = r.json()
+        print("data proof", data['proof'])
+        last_proof = data["proof"]
+
         new_proof = proof_of_work(data.get('proof'))
+
+        if new_proof == "restart":
+            continue
 
         post_data = {"proof": new_proof,
                      "id": id}
